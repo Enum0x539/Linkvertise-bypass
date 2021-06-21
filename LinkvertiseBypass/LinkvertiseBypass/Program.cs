@@ -13,8 +13,8 @@ namespace LinkvertiseBypass
             Console.WriteLine("Enter a vaild link: ");
             string link = Console.ReadLine();
 
-            string[] pastterns = { "https://linkvertise.com/", "https://up-to-down.net/", "https://link-to.net/", "https://direct-link.net/", "https://file-link.net" };
-            if (!pastterns.Any(x => link.StartsWith(x)))
+            string[] patterns = { "https://linkvertise.com/", "https://up-to-down.net/", "https://link-to.net/", "https://direct-link.net/", "https://file-link.net" };
+            if (!patterns.Any(x => link.StartsWith(x)))
             {
                 Console.WriteLine("The given input was not a vaild Linkvertise link,\nPress any key to restart.");
                 Console.ReadKey();
