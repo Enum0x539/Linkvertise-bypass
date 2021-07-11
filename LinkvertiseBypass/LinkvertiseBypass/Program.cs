@@ -67,7 +67,7 @@ namespace LinkvertiseBypass
                 switch (field.Substring(2, fieldLength))
                 {
                     case "success":
-                        this.Success = fieldValue.ToLower().Contains("fal") ? false : true;
+                        this.Success = !fieldValue.ToLower().Contains("fal");
                         break;
 
                     case "destination":
