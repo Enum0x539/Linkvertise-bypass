@@ -1,7 +1,8 @@
-﻿using System;
+using System;
 using System.IO;
 using System.Linq;
 using System.Net;
+using System.Web.Script.Serialization;
 
 namespace LinkvertiseBypass
 {
@@ -9,88 +10,95 @@ namespace LinkvertiseBypass
     {
         private static void Main()
         {
-            Console.Clear();
-            Console.WriteLine("Enter a vaild link: ");
-            string link = Console.ReadLine();
-
-            string[] patterns = { "https://linkvertise.com/", "https://up-to-down.net/", "https://link-to.net/", "https://direct-link.net/", "https://file-link.net" };
-            if (!patterns.Any(x => link.StartsWith(x)))
+            while (true)
             {
-                Console.WriteLine("The given input was not a vaild Linkvertise link,\nPress any key to restart.");
+                Console.Clear();
+                Console.WriteLine("Enter a valid Linkvertise URL:");
+
+                string link = Console.ReadLine();
+
+                // Known Linkvertise domains
+                string[] validPatterns =
+                {
+                    "https://linkvertise.com/",
+                    "https://up-to-down.net/",
+                    "https://link-to.net/",
+                    "https://direct-link.net/",
+                    "https://file-link.net/"
+                };
+
+                if (!validPatterns.Any(pattern => link.StartsWith(pattern, StringComparison.OrdinalIgnoreCase)))
+                {
+                    Console.WriteLine("❌ The input is not a valid Linkvertise link.\nPress any key to try again.");
+                    Console.ReadKey();
+                    continue;
+                }
+
+                try
+                {
+                    Console.Clear();
+                    LinkvertiseResponse result = Bypass(link);
+
+                    Console.WriteLine("✅ Bypass Successful!");
+                    Console.WriteLine($"🔎 Query:       {result.Query}");
+                    Console.WriteLine($"🎯 Destination: {result.Destination}");
+                    Console.WriteLine($"⏱️ Time:         {result.Time} ms");
+                    Console.WriteLine($"🕒 Cache TTL:    {result.CacheTtl}");
+                    Console.WriteLine($"🔌 Plugin:       {result.Plugin}");
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"❌ Bypass failed: {ex.Message}");
+                }
+
+                Console.WriteLine("\nPress any key to bypass another link...");
                 Console.ReadKey();
-                Main();
             }
-
-            Console.Clear();
-            Linkvertise object_ = Bypass(link);
-            Console.WriteLine($"Query: {object_.Query}" +
-                              $"\nDestination: {object_.Destination}" +
-                              $"\nTime: {object_.Time} ms." +
-                              $"\nCache TTL: {object_.Cache_ttl}" +
-                              $"\nPlugin: {object_.Plugin}");
-
-            Console.ReadLine();
         }
 
-        private static Linkvertise Bypass(string URL)
+        /// <summary>
+        /// Sends the given Linkvertise URL to the public bypass API and returns the parsed response.
+        /// </summary>
+        private static LinkvertiseResponse Bypass(string url)
         {
-            HttpWebRequest request = (HttpWebRequest)WebRequest.Create($"https://bypass.bot.nu/bypass2?url={URL}");
+            string api = $"https://bypass.bot.nu/bypass2?url={url}";
+            HttpWebRequest request = (HttpWebRequest)WebRequest.Create(api);
             request.Referer = "https://thebypasser.com";
             request.Headers.Add("DNT", "1");
             request.Accept = "*/*";
-            try
+
+            using (HttpWebResponse response = (HttpWebResponse)request.GetResponse())
+            using (StreamReader reader = new StreamReader(response.GetResponseStream()))
             {
-                Linkvertise result = new Linkvertise(new StreamReader(((HttpWebResponse)request.GetResponse()).GetResponseStream()).ReadToEnd());
-                return result.Success ? result : throw new Exception("There was an error.");
+                string json = reader.ReadToEnd();
+                JavaScriptSerializer serializer = new JavaScriptSerializer();
+                var result = serializer.Deserialize<LinkvertiseResponse>(json);
+
+                if (!result.Success)
+                    throw new Exception("API returned an unsuccessful response.");
+
+                return result;
             }
-            catch (WebException ex) { throw ex; }
         }
     }
 
-    public class Linkvertise
+    /// <summary>
+    /// Deserializable class to represent the API response.
+    /// </summary>
+    public class LinkvertiseResponse
     {
-        public string Destination;
-        public string Query;
-        public bool Success;
-        public int Time;
-        public long Cache_ttl;
-        public string Plugin;
+        public bool Success { get; set; }
+        public string Destination { get; set; }
+        public string Query { get; set; }
+        public int Time { get; set; }
+        public long CacheTtl { get; set; }
+        public string Plugin { get; set; }
 
-        public Linkvertise(string Response)
+        // Handles possible variations in API field naming
+        public void FixLegacyFields(dynamic raw)
         {
-            string[] parameters = Response.Replace("{", "").Replace("}", "").Split(',');
-            foreach (string field in parameters)
-            {
-                int fieldLength = field.IndexOf('"', 2) - 2;
-                string fieldValue = field.Substring(field.IndexOf(':') + 2).Replace("\"", "");
-
-                switch (field.Substring(2, fieldLength))
-                {
-                    case "success":
-                        this.Success = !fieldValue.ToLower().Contains("fal");
-                        break;
-
-                    case "destination":
-                        this.Destination = fieldValue;
-                        break;
-
-                    case "uery":
-                        this.Query = fieldValue;
-                        break;
-
-                    case "time_ms":
-                        this.Time = int.Parse(fieldValue);
-                        break;
-
-                    case "cache_ttl":
-                        this.Cache_ttl = long.Parse(fieldValue);
-                        break;
-
-                    case "plugin":
-                        this.Plugin = fieldValue;
-                        break;
-                }
-            }
+            if (string.IsNullOrEmpty(Query) && raw.ContainsKey("query"))
+                Query = raw["query"];
         }
     }
 }
